@@ -490,7 +490,18 @@ def generate_review_report(mci_data, config, report_texts):
         lines.append("     Price action: " + describe_price_action(summary))
         if summary["fear_greed"] is not None:
             fg = summary["fear_greed"]
-            fg_cls = summary["fg_classification"] or ""
+            fg_cls = summary["fg_classification"]
+            if not fg_cls:
+                if fg <= 20:
+                    fg_cls = "Extreme Fear"
+                elif fg <= 40:
+                    fg_cls = "Fear"
+                elif fg <= 60:
+                    fg_cls = "Neutral"
+                elif fg <= 80:
+                    fg_cls = "Greed"
+                else:
+                    fg_cls = "Extreme Greed"
             lines.append("     Fear/Greed: " + str(fg) + " (" + fg_cls + ")")
         lines.append("     City Pulse: " + asset_quote)
         
