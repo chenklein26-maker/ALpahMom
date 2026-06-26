@@ -1,57 +1,57 @@
-# CLAUDE.md — AlphaMom Developer Guidelines
+# CLAUDE.md — AlphaMom 开发者指南
 
-Guidelines and commands for developer agents working on the **AlphaMom (宝妈反买量化指数)** project.
+本文档为开发智能 Agent（如 Antigravity / Claude Code）在本项目中的开发与执行提供指令指南和规范约束。
 
 ---
 
-## 🚀 Frequently Used Commands
+## 🚀 常用指令
 
-### 1. Run Data Pipeline (End-to-End)
-Execute these commands in sequence to fetch data, compute the index, and generate reports:
+### 1. 运行数据流水线 (端到端)
+在后台依序执行以下脚本以抓取数据、计算指数并生成播报：
 ```bash
-# Fetch Crypto Sentiment & Market Data
+# 抓取加密货币情绪与市场数据
 python scripts/fetch_crypto.py --config assets/config_template.json --output data/crypto_raw.json
 
-# Fetch A-Stock Sentiment & Market Data
+# 抓取 A 股情绪与市场数据
 python scripts/fetch_astock.py --config assets/config_template.json --output data/astock_raw.json
 
-# Compute Mommy Crowding Index (MCI)
+# 计算宝妈拥挤度指数 (MCI)
 python scripts/compute_mci.py --crypto data/crypto_raw.json --astock data/astock_raw.json --output data/mci_result.json
 
-# Generate Satirical Report (review mode)
+# 生成讽刺广播避险报告 (今日复盘模式)
 python scripts/report.py --mci data/mci_result.json --config assets/config_template.json --mode review
 ```
 
-### 2. Preview Dashboard Web UI
-Run a local development web server to host the macOS light/dark-mode dashboard:
+### 2. 预览 Web 端 macOS 仪表盘
+启动本地轻量级 HTTP 服务以托管 macOS 质感的双模仪表盘：
 ```bash
 python -m http.server 8000
 ```
-Open **[http://127.0.0.1:8000](http://127.0.0.1:8000)** in your browser to verify the interactive weight controls and canvas poster generation.
+在浏览器中打开 **[http://127.0.0.1:8000](http://127.0.0.1:8000)**，以测试滑块交互、Z-Score 离散气泡及海报下载功能。
 
 ---
 
-## 🎙️ Tone, Style & Persona Guidelines
+## 🎙️ 广播电台人设与语气规范
 
-All user-facing messages, console outputs, and dashboard texts must adhere to the **Cyber Sentiment Radio** persona:
-1. **Sarcastic Broadcasting Voice**: Use a dystopian, highly satirical, fast-paced American-radio-show style localized to financial markets.
-2. **Playful Retail Address**: Address the retail audience using sarcastic trading terms:
-   - `天台VIP们` (Rooftop VIPs - for extreme freeze/fear)
-   - `接盘侠们` (Bagholders / Exit Liquidity)
-   - `天才交易员们` (Genius Traders / Day Traders)
-   - `金融巨鳄们` (Financial Tycoons - for retail FOMO)
-   - `韭菜们` (Leeks)
-3. **No Game-Specific Lore**: **Never** mention game-specific terms from *Cyberpunk 2077* (such as *Night City*, *Arasaka*, *NCPD*, *Eurodollars/Eddies*, *Blackwall*, *Kabuki*, or characters like *Stanley*). Keep the context 100% focused on real-world assets (Gold, A-shares, Crypto, Moutai, 招商中证白酒) and real-life retail traders/aunts.
-4. **LLM Prompts Reference**: Future agents can inspect [assets/mama_quotes.json](file:///c:/Users/v_clulcchen/Desktop/RYu/Coding/宝妈反买/assets/mama_quotes.json) to study the offline fallback templates for tone, sarcasm depth, and copywriting styles when formulating LLM prompts.
+本项目所有面向用户的输出（控制台打印、网页文本、海报生成）必须严格遵守 **Cyber Sentiment Radio (赛博情绪电台)** 语气人设：
+1. **辛辣讽刺的电台播报腔**：使用快节奏、黑色幽默、冷嘲热讽的美式电台主持人口吻。
+2. **戏谑的用户称呼**：针对散户使用特定的理财讽刺代称，必须根据市场冷热动态使用以下称呼：
+   - `天台VIP们` (针对冰封/极冷恐慌区)
+   - `接盘侠们` (针对极热/泡沫过热区)
+   - `天才交易员们` (反讽加杠杆的散户)
+   - `金融巨鳄们` (调侃跑步进场的业余投资者)
+   - `韭菜们` (泛指)
+3. **去游戏化规范 (关键)**：**严禁**提到任何《赛博朋克2077》相关的特定虚构名词（如：*夜之城/Night City*、*荒坂/Arasaka*、*NCPD*、*欧金/Eurodollars*、*黑墙/Blackwall*、*歌舞伎町*、*斯坦利*等）。一切内容必须聚焦于现实中的真实理财市场（A股、加密货币、黄金、白酒、茅台等）及现实中的散户行为。
+4. **LLM 提示词参考**：开发 Agent 在为大模型编写提示词时，可直接参考 [assets/mama_quotes.json](file:///c:/Users/v_clulcchen/Desktop/RYu/Coding/宝妈反买/assets/mama_quotes.json) 以对齐本地静态兜底模板的讽刺深度与文本句式。
 
 ---
 
-## 🛠️ Tech Stack & Implementation Rules
+## 🛠️ 技术规范与执行机制
 
-1. **LLM Generation with Fallback**:
-   - The system uses **DeepSeek API (`deepseek-chat`)** via Open-AI compatible payload formats.
-   - Env key: `DEEPSEEK_API_KEY`. Config path: `llm_config.deepseek_api_key`.
-   - **Fail-safe fallback**: If the key is missing or API request fails, the report engine must automatically fall back to static templated generation loaded from `assets/mama_quotes.json`.
-2. **Dual-Mode Web Dashboard**:
-   - Fully client-side responsive macOS layout with segment toggling between **Lite Mode** (action-centric cards, large signal bulbs, poster download) and **Pro Mode** (weights adjust sliders, Z-Score volatility badges, and milestone markers on Chart.js).
-   - Dynamic weight calculations must happen 100% locally in `index.html` to avoid API request latencies.
+1. **大模型动态播报与降级逻辑**：
+   - 默认接入 **DeepSeek API (`deepseek-chat` 模型)**。
+   - 环境变量 Key 为 `DEEPSEEK_API_KEY`，配置文件字段为 `llm_config.deepseek_api_key`。
+   - **自愈式降级**：若未配置 Key 或接口调用异常（如网络超时、配额耗尽等），程序必须通过 `try...except` **无感回退降级**为本地静态模板加载（即 `mama_quotes.json`），绝不能中断报错导致 Agent 挂机。
+2. **双模 Web 看板交互**：
+   - 双模切换（Lite 模式与 Pro 模式）通过 CSS 类名优雅隐显过渡。
+   - **性能约束**：为保证极致交互手感，在网页 Pro 模式中用户拖动滑块权重时，MCI 与评语重算**必须在前端 JS 本地内存中在毫秒级内瞬间完成**，严禁向后端或 LLM 发送同步请求，确保零延迟响应。
