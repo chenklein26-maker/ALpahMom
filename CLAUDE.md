@@ -6,23 +6,39 @@
 
 ## 🚀 常用指令
 
-### 1. 运行数据流水线 (端到端)
-在后台依序执行以下脚本以抓取数据、计算指数并生成播报：
+### 1. 运行数据流水线 (一键端到端)
+您可以使用以下单条命令运行整个数据流，包括数据抓取、MCI指数计算以及大模型播报生成：
 ```bash
-# 抓取加密货币情绪与市场数据
-python scripts/fetch_crypto.py --config assets/config_template.json --output data/crypto_raw.json
+# 一键运行整条流水线 (默认生成今日复盘报告)
+python run.py
 
-# 抓取 A 股情绪与市场数据
-python scripts/fetch_astock.py --config assets/config_template.json --output data/astock_raw.json
+# 一键运行并生成 HTML 海报
+python run.py --html output/report.html
 
-# 计算宝妈拥挤度指数 (MCI)
-python scripts/compute_mci.py --crypto data/crypto_raw.json --astock data/astock_raw.json --output data/mci_result.json
-
-# 生成讽刺广播避险报告 (今日复盘模式)
-python scripts/report.py --mci data/mci_result.json --config assets/config_template.json --mode review
+# 一键运行生成简短避险信号模式
+python run.py --mode signal
 ```
 
-### 2. 预览 Web 端 macOS 仪表盘
+> [!TIP]
+> 如果您是首次克隆此项目，运行 `python run.py` 会自动为您在根目录生成默认的 `alpha_mom_config.json` 配置文件。您可以直接在其中配置您的 `DEEPSEEK_API_KEY` 以启用大模型动态播报。
+
+### 2. 高级用法 (分步执行)
+如果您需要调试特定模块，亦可依序执行以下子脚本：
+```bash
+# 1. 抓取加密货币情绪与市场数据
+python scripts/fetch_crypto.py --config alpha_mom_config.json --output data/crypto_raw.json
+
+# 2. 抓取 A 股情绪与市场数据
+python scripts/fetch_astock.py --config alpha_mom_config.json --output data/astock_raw.json
+
+# 3. 计算宝妈拥挤度指数 (MCI)
+python scripts/compute_mci.py --crypto data/crypto_raw.json --astock data/astock_raw.json --output data/mci_result.json
+
+# 4. 生成讽刺广播避险报告 (今日复盘模式)
+python scripts/report.py --mci data/mci_result.json --config alpha_mom_config.json --mode review
+```
+
+### 3. 预览 Web 端 macOS 仪表盘
 启动本地轻量级 HTTP 服务以托管 macOS 质感的双模仪表盘：
 ```bash
 python -m http.server 8000
