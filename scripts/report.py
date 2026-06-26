@@ -111,9 +111,8 @@ def get_mama_quote(mci, sass_level="medium"):
     quote = random.choice(quotes)
     return quote
 
-def generate_text_report(mci_data, config, quotes_json=None):
+def generate_text_report(mci_data, config, report_texts):
     date_str = datetime.now().strftime("%Y-%m-%d %H:%M")
-    sass = config.get("sass_level", "medium")
 
     lines = []
     lines.append(f"\n{'='*65}")
@@ -127,11 +126,7 @@ def generate_text_report(mci_data, config, quotes_json=None):
         mci_str = f"{p_mci}%" if p_mci is not None else "N/A"
         lines.append(f"\n  📊 组合总拥挤度: {mci_str} {p_level['icon']} {p_level['level']}")
         
-        quote = get_mama_quote(p_mci, sass)
-        if quotes_json:
-            key = get_level_key(p_mci)
-            if key in quotes_json:
-                quote = random.choice(quotes_json[key])
+        quote = report_texts["portfolio_quote"]
                 
         lines.append(f"  📢 电台主播播报: {quote}")
         lines.append(f"  🔔 避险信号: {p_level['signal_icon']} {p_level['signal']}")
@@ -142,11 +137,16 @@ def generate_text_report(mci_data, config, quotes_json=None):
     for asset in mci_data.get("assets", []):
         mci = asset["mci"]
         level = asset["level"]
+        sym = asset["symbol"]
         mci_str = f"{mci}%" if mci is not None else "N/A"
         market_tag = "🔐" if asset.get("market") == "crypto" else "📈"
         lines.append(f"\n  {market_tag} {asset['name']} ({asset['symbol']})")
         lines.append(f"     MCI = {mci_str} {level['icon']} {level['level']}")
-        lines.append(f"     避险建议: {level['signal_icon']} {level['signal']}")
+        lines.append(f"     避险信号: {level['signal_icon']} {level.get('signal', '')}")
+        
+        asset_texts = report_texts.get("assets", {}).get(sym, {})
+        advice = asset_texts.get("advice", "")
+        lines.append(f"     逆向指导: {advice}")
 
         lines.append(f"     ┌─ 维度数据:")
         for dim_name in ["fear_greed", "search_interest", "derivatives", "price_trend", "social_sentiment"]:
@@ -276,7 +276,179 @@ def detect_correlation(assets):
         correlations.append("You cross both corporate shares and crypto. Capital rotates between them like a seesaw.")
     return " ".join(correlations) if correlations else None
 
-def generate_review_report(mci_data, config, quotes_json=None):
+def call_deepseek_api(mci_data, config):
+    api_key = os.environ.get("DEEPSEEK_API_KEY")
+    llm_conf = config.get("llm_config", {})
+    if not api_key:
+        api_key = llm_conf.get("deepseek_api_key")
+    if not api_key:
+        raise ValueError("DEEPSEEK_API_KEY not found in environment or config.")
+    if not llm_conf.get("enabled", True):
+        raise ValueError("LLM generation is disabled in config.")
+        
+    model_name = llm_conf.get("model_name", "deepseek-chat")
+    api_base = llm_conf.get("api_base", "https://api.deepseek.com/v1")
+    api_base = api_base.rstrip("/")
+    url = f"{api_base}/chat/completions"
+    
+    # Prepare prompt
+    import json
+    input_str = json.dumps(mci_data, ensure_ascii=False, indent=2)
+    
+    system_prompt = """你是一个辛辣讽刺、充满幽默感的财经电台主播。你的任务是根据给定的量化情绪指标数据（宝妈反买量化指标 MCI，价格偏离，衍生品杠杆等），生成一份今日大盘避险播报。
+你的称呼对象是一群狂热而又盲目的散户，请使用“天台VIP们”、“接盘侠们”、“天才交易员们”、“金融巨鳄们”或“韭菜们”等戏谑称呼。不要提到任何与游戏《赛博朋克2077》相关的名词（如夜之城、荒坂、NCPD、欧金等），纯粹对齐现实中真实的金融与理财市场（A股、加密货币、黄金、白酒等）。
+
+你必须返回一个符合以下 JSON 结构的有效 JSON 字符串：
+{
+  "portfolio_quote": "今日大盘广播大白话点评",
+  "assets": {
+    "SYMBOL": {
+      "quote": "该资产的戏谑点评",
+      "advice": "该资产的逆向操作避险建议"
+    }
+  },
+  "tomorrow_watch": [
+    "明日警告关注点 1",
+    "明日警告关注点 2"
+  ],
+  "golden_quote": "今日电台金句"
+}
+"""
+
+    user_prompt = f"""这是今日的量化数据，请分析并生成避险播报：
+{input_str}
+"""
+
+    import requests
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "model": model_name,
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt}
+        ],
+        "response_format": {
+            "type": "json_object"
+        },
+        "temperature": 0.7
+    }
+    
+    response = requests.post(url, headers=headers, json=payload, timeout=20)
+    response.raise_for_status()
+    
+    res_json = response.json()
+    text_content = res_json["choices"][0]["message"]["content"]
+    
+    # Parse the text response as JSON robustly stripping markdown blocks
+    content = text_content.strip()
+    if content.startswith("```json"):
+        content = content[7:]
+    if content.startswith("```"):
+        content = content[3:]
+    if content.endswith("```"):
+        content = content[:-3]
+    parsed = json.loads(content.strip())
+    return parsed
+
+def get_fallback_report_texts(mci_data, config, quotes_json=None):
+    portfolio = mci_data.get("portfolio", {})
+    p_mci = portfolio.get("mci")
+    
+    portfolio_quote = get_mama_quote(p_mci, config.get("sass_level", "medium"))
+    if quotes_json:
+        key = get_level_key(p_mci)
+        if key in quotes_json:
+            portfolio_quote = random.choice(quotes_json[key])
+            
+    assets = {}
+    for asset in mci_data.get("assets", []):
+        mci = asset["mci"]
+        sym = asset["symbol"]
+        quote = describe_mama_reaction(mci, quotes_json)
+        
+        sym_upper = sym.upper()
+        if mci is None:
+            advice = "Data node offline. Diagnostic unavailable."
+        else:
+            if "518880" in sym_upper or "黄金" in asset.get("name", ""):
+                if mci >= 81:
+                    advice = "黄金暴涨！街头疯传金条比房产证还保值，接盘侠们甚至连夜去金店排队抢购，狂热度彻底炸裂！强烈建议逢高分批抛售，把本金落袋为安，快逃！"
+                elif mci >= 61:
+                    advice = "金价新高让写字楼里的投机狗们蠢蠢欲动，午餐时间全在讨论是买实物金还是开通加倍杠杆。风暴将至，建议分批止盈，降低仓位。"
+                elif mci >= 41:
+                    advice = "避险金属在箱体正常调整，庄家和投机客都对它反应平平。"
+                elif mci >= 21:
+                    advice = "金价低位盘整，天才交易员们嫌弃黄金没有垃圾题材股刺激，兴趣寥寥。逆向来看，这反而是绝佳的避险防御配置期。"
+                else:
+                    advice = "黄金冷门无人问津，金店专柜冷清得只有流浪汉在捡垃圾，大伙直呼黄金是旧时代遗产。逆向思考：这正是分批低吸的黄金底！"
+            elif "161725" in sym_upper or "白酒" in asset.get("name", ""):
+                if mci >= 81:
+                    advice = "白酒基金净值狂飙，讨论区纷纷直呼‘股神万岁’，社畜把买房的私房钱全梭哈了。贪婪爆表！强烈建议立刻分批套现离场，别等庄家拔插头！"
+                elif mci >= 61:
+                    advice = "白酒异动，隔壁的游资大佬都在打听要不要上车。拉响高位警报，别做机构的垫脚石，建议开始逢高分批减仓。"
+                elif mci >= 41:
+                    advice = "白酒板块正常盘整，散户们反应中性，无异常追加或割肉。建议暂时保持底仓，静观其变。"
+                elif mci >= 21:
+                    advice = "白酒阴跌不断，大伙直叹气表示‘年轻人不喝白酒了，只喝气泡水和咖啡了’。情绪偏冷，中线布局的筹码正在变得便宜。"
+                else:
+                    advice = "白酒板块崩盘跌破红线，讨论区一片尸骨无存的哀嚎，都在痛骂‘基金经理下课’。情绪极寒，主力筹码出清，正是中线分批捡漏的黄金大坑！"
+            elif "600519" in sym_upper or "茅台" in asset.get("name", ""):
+                if mci >= 81:
+                    advice = "核心资产被炒到了天上，炒家和白领都在疯狂囤货，扬言它能涨到云端。泡沫明显，强烈建议逢高分批套现退场，天才交易员们！"
+                elif mci >= 61:
+                    advice = "股价反弹，朋友圈里的微商和炒客都在吹嘘资产金融属性。注意保护好你的核心利润，防范机构高位收网，建议考虑减仓。"
+                elif mci >= 41:
+                    advice = "茅台在平稳波动，街头没有任何异常的买卖动静。建议继续保持仓位不动，吃瓜看戏。"
+                elif mci >= 21:
+                    advice = "低迷横盘，大伙表示‘传统股已经没有成长性了’。大盘情绪偏冷，适合中长线分批逐步建仓。"
+                else:
+                    advice = "直线下跌，大伙惊呼‘信仰已死，以后不碰实体股了’。逆向思维：高端消费资产被极度超卖，正是左侧大举分批买入的良机！"
+            else: # Crypto (BTC/ETH) or general
+                if mci >= 81:
+                    advice = "市场彻底疯了！每个人都自以为是下一个暴富股神，狂晒千倍神话收益，连办公楼底下的快餐阿姨都在问你怎么开户！狂热度炸裂！快火速抛售退场！"
+                elif mci >= 61:
+                    advice = "韭菜们开始打听如何注册去中心化钱包，热度正在上升。空气里满是危险的本金炮灰味，建议提高警惕，保护利润，分批高抛。"
+                elif mci >= 41:
+                    advice = "市场处于正常盘整区间，大伙都在各自按部就班生活。建议继续持有，静观其变。"
+                elif mci >= 21:
+                    advice = "筹码无人问津，甚至有人为了生活费把交易账户清算注销了。逆向而言，这往往是中线分批建仓的宁静良机。"
+                else:
+                    advice = "大伙已割肉离场，频道里死寂一片，上次提到这名字的家伙已经被交易所清算归零。极度深寒正是主力的吸筹坑，买入信号极为强烈！"
+        assets[sym] = {"quote": quote, "advice": advice}
+        
+    tomorrow_watch = []
+    if p_mci is None:
+        tomorrow_watch.append("暂无足够数据评估明日方向。")
+    elif p_mci >= 61:
+        tomorrow_watch.append("当前贪婪度过热。明天重点关注社交媒体是否出现新的散户跑步开户、甚至抵押家当梭哈的信号。")
+        tomorrow_watch.append("如果组合 MCI 突破 80%，需坚决执行止盈减仓计划，保住你可怜的本金。")
+    elif p_mci <= 40:
+        tomorrow_watch.append("韭菜退潮。指数进入深度超卖的恐慌底部，密切关注主力低吸企稳信号。")
+        tomorrow_watch.append("若组合 MCI 跌破 20%，这是散户与游资逆袭重仓的绝佳黄金坑。")
+    else:
+        tomorrow_watch.append("当前市场情绪中性。以静制动，捂紧你的钱包，切忌盲目追高或割肉。")
+        
+    golden_quote = random.choice(REVIEW_GOLDEN_QUOTES)
+    
+    return {
+        "portfolio_quote": portfolio_quote,
+        "assets": assets,
+        "tomorrow_watch": tomorrow_watch,
+        "golden_quote": golden_quote
+    }
+
+def get_report_texts(mci_data, config, quotes_json=None):
+    try:
+        print("[INFO] 尝试使用 DeepSeek 大模型生成今日动态播报...", file=sys.stderr)
+        return call_deepseek_api(mci_data, config)
+    except Exception as e:
+        print(f"[WARN] DeepSeek 生成失败，自动启用本地静态模板降级: {e}", file=sys.stderr)
+        return get_fallback_report_texts(mci_data, config, quotes_json)
+
+def generate_review_report(mci_data, config, report_texts):
     date_str = datetime.now().strftime("%Y-%m-%d %H:%M")
     lines = []
     lines.append("")
@@ -291,43 +463,37 @@ def generate_review_report(mci_data, config, quotes_json=None):
     lines.append("  Today's city state in one sentence:")
     lines.append("  Portfolio Crowd Intensity: " + p_mci_str + " " + str(p_level.get("icon", "")) + " " + str(p_level.get("level", "")))
     lines.append("  " + str(p_level.get("mama_status", "")))
-    mama_quote = get_mama_quote(p_mci)
-    if quotes_json:
-        key = get_level_key(p_mci)
-        if key in quotes_json:
-            mama_quote = random.choice(quotes_json[key])
-    lines.append("  " + mama_quote)
+    
+    quote = report_texts["portfolio_quote"]
+    lines.append("  " + quote)
     lines.append("")
     lines.append("=" * 56)
     lines.append("  Diagnostic Breakdown:")
     for asset in mci_data.get("assets", []):
         summary = get_asset_daily_summary(asset)
         mci = summary["mci"]
+        sym = summary["symbol"]
         mci_str = f"{mci}%" if mci is not None else "N/A"
         level = summary["level"]
         market_tag = "[C]" if summary["market"] == "crypto" else "[A]"
         lines.append("")
         lines.append("  " + market_tag + " " + summary["name"] + " (" + summary["symbol"] + ")")
         lines.append("     MCI: " + mci_str + " " + str(level.get("icon", "")) + " " + str(level.get("level", "")))
+        
         lines.append("     Signal: " + str(level.get("signal_icon", "")) + " " + str(level.get("signal", "")))
+        
+        asset_texts = report_texts.get("assets", {}).get(sym, {})
+        advice = asset_texts.get("advice", "")
+        asset_quote = asset_texts.get("quote", "")
+        
+        lines.append("     Advice: " + advice)
         lines.append("     Price action: " + describe_price_action(summary))
         if summary["fear_greed"] is not None:
             fg = summary["fear_greed"]
             fg_cls = summary["fg_classification"] or ""
             lines.append("     Fear/Greed: " + str(fg) + " (" + fg_cls + ")")
-        lines.append("     City Pulse: " + describe_mama_reaction(mci, quotes_json))
-        if mci is None:
-            lines.append("     Advice: Node offline. Check API endpoints.")
-        elif mci >= 81:
-            lines.append("     Advice: Crowd peak - sell. Do not wait for institutions to harvest your margin.")
-        elif mci >= 61:
-            lines.append("     Advice: Heat rising - risk alert. Consider trimming positions.")
-        elif mci >= 41:
-            lines.append("     Advice: Calm night. Hold and keep your eyes open.")
-        elif mci >= 21:
-            lines.append("     Advice: Cold sector - accumulate. Good entry window.")
-        else:
-            lines.append("     Advice: Extreme silence. Blood on the streets. Time to buy.")
+        lines.append("     City Pulse: " + asset_quote)
+        
     correlation = detect_correlation(mci_data.get("assets", []))
     if correlation:
         lines.append("")
@@ -337,20 +503,12 @@ def generate_review_report(mci_data, config, quotes_json=None):
     lines.append("")
     lines.append("=" * 56)
     lines.append("  Tomorrow's Watch:")
-    if p_mci is None:
-        lines.append("  - Data offline.")
-    elif p_mci >= 61:
-        lines.append("  - Crowd rush. Watch for new retail accounts opening tomorrow.")
-        lines.append("  - If MCI hits 80%, dump positions immediately. Protect your principal.")
-    elif p_mci <= 40:
-        lines.append("  - Silent sector. Watch for bottom stabilization.")
-        lines.append("  - Below 20% is the ultimate discount pit.")
-    else:
-        lines.append("  - Neutral state. Maintain stance. No chasing.")
+    for watch_item in report_texts.get("tomorrow_watch", []):
+        lines.append("  - " + watch_item)
     lines.append("")
     lines.append("=" * 56)
     lines.append("  City Golden Quote:")
-    lines.append('  "' + random.choice(REVIEW_GOLDEN_QUOTES) + '"')
+    lines.append('  "' + report_texts.get("golden_quote", "") + '"')
     lines.append("")
     lines.append("-" * 56)
     lines.append("  Disclaimer: For entertainment only. Keep your hard-earned money safe.")
@@ -358,7 +516,7 @@ def generate_review_report(mci_data, config, quotes_json=None):
     lines.append("")
     return "\n".join(lines)
 
-def generate_html_report(mci_data, config, quotes_json=None):
+def generate_html_report(mci_data, config, report_texts):
     date_str = datetime.now().strftime("%Y-%m-%d %H:%M")
     portfolio = mci_data.get("portfolio", {})
     p_mci = portfolio.get("mci", 0)
@@ -372,6 +530,7 @@ def generate_html_report(mci_data, config, quotes_json=None):
     for asset in mci_data.get("assets", []):
         mci = asset["mci"]
         level = asset["level"]
+        sym = asset["symbol"]
         market_tag = "🔐" if asset.get("market") == "crypto" else "📈"
         
         dims_html = ""
@@ -388,6 +547,9 @@ def generate_html_report(mci_data, config, quotes_json=None):
                 dims_html += f'<div class="dim-row"><span class="dim-name">{name}</span><div class="dim-bar"><div class="dim-fill" style="width:0%"></div></div><span class="dim-score dim-na">N/A</span></div>'
 
         asset_color = color_map.get(level.get("icon", ""), "#10b981")
+        asset_texts = report_texts.get("assets", {}).get(sym, {})
+        advice = asset_texts.get("advice", level.get("signal", ""))
+        
         asset_cards += f'''
         <div class="asset-card" style="border-left-color:{asset_color}">
             <div class="asset-header">
@@ -397,15 +559,11 @@ def generate_html_report(mci_data, config, quotes_json=None):
                 <span class="asset-mci" style="color:{asset_color}">{mci}%</span>
                 <span class="asset-level">{level.get('icon','')} {level.get('level','')}</span>
             </div>
-            <div class="asset-signal">{level.get('signal_icon','')} {level.get('signal','')}</div>
+            <div class="asset-signal">{level.get('signal_icon','')} {advice}</div>
             <div class="dims">{dims_html}</div>
         </div>'''
 
-    quote = get_mama_quote(p_mci)
-    if quotes_json:
-        key = get_level_key(p_mci)
-        if key in quotes_json:
-            quote = random.choice(quotes_json[key])
+    quote = report_texts["portfolio_quote"]
 
     html = f'''<!DOCTYPE html>
 <html lang="zh-CN">
@@ -519,75 +677,25 @@ def update_history(mci_data):
     with open(history_file, 'w', encoding='utf-8') as f:
         json.dump(history, f, ensure_ascii=False, indent=2)
 
-def generate_web_report(mci_data, config, quotes_json=None):
+def generate_web_report(mci_data, config, report_texts):
     web_report_file = "data/web_report.json"
     
     portfolio = mci_data.get("portfolio", {})
     p_mci = portfolio.get("mci")
     p_level = portfolio.get("level", {})
     
-    quote = get_mama_quote(p_mci)
-    if quotes_json:
-        key = get_level_key(p_mci)
-        if key in quotes_json:
-            quote = random.choice(quotes_json[key])
+    quote = report_texts["portfolio_quote"]
             
     assets_list = []
     for asset in mci_data.get("assets", []):
         summary = get_asset_daily_summary(asset)
         mci = summary["mci"]
         level = summary["level"]
+        sym = summary["symbol"]
         
-        sym_upper = summary["symbol"].upper()
-        if mci is None:
-            advice = "Data node offline. Diagnostic unavailable."
-        else:
-            if "518880" in sym_upper or "黄金" in asset.get("name", ""):
-                if mci >= 81:
-                    advice = "黄金暴涨！街头疯传金条比房产证还保值，接盘侠们甚至连夜去金店排队抢购，狂热度彻底炸裂！强烈建议逢高分批抛售，把本金落袋为安，快逃！"
-                elif mci >= 61:
-                    advice = "金价新高让写字楼里的投机狗们蠢蠢欲动，午餐时间全在讨论是买实物金还是开通加倍杠杆。风暴将至，建议分批止盈，降低仓位。"
-                elif mci >= 41:
-                    advice = "避险金属在箱体正常调整，庄家和投机客都对它反应平平。"
-                elif mci >= 21:
-                    advice = "金价低位盘整，天才交易员们嫌弃黄金没有垃圾题材股刺激，兴趣寥寥。逆向来看，这反而是绝佳的避险防御配置期。"
-                else:
-                    advice = "黄金冷门无人问津，金店专柜冷清得只有流浪汉在捡垃圾，大伙直呼黄金是旧时代遗产。逆向思考：这正是分批低吸的黄金底！"
-            elif "161725" in sym_upper or "白酒" in asset.get("name", ""):
-                if mci >= 81:
-                    advice = "白酒基金净值狂飙，讨论区纷纷直呼‘股神万岁’，社畜把买房的私房钱全梭哈了。贪婪爆表！强烈建议立刻分批套现离场，别等庄家拔插头！"
-                elif mci >= 61:
-                    advice = "白酒异动，隔壁的游资大佬都在打听要不要上车。拉响高位警报，别做机构的垫脚石，建议开始逢高分批减仓。"
-                elif mci >= 41:
-                    advice = "白酒板块正常盘整，散户们反应中性，无异常追加或割肉。建议暂时保持底仓，静观其变。"
-                elif mci >= 21:
-                    advice = "白酒阴跌不断，大伙直叹气表示‘年轻人不喝白酒了，只喝气泡水和咖啡了’。情绪偏冷，中线布局的筹码正在变得便宜。"
-                else:
-                    advice = "白酒板块崩盘跌破红线，讨论区一片尸骨无存的哀嚎，都在痛骂‘基金经理下课’。情绪极寒，主力筹码出清，正是中线分批捡漏的黄金大坑！"
-            elif "600519" in sym_upper or "茅台" in asset.get("name", ""):
-                if mci >= 81:
-                    advice = "核心资产被炒到了天上，炒家和白领都在疯狂囤货，扬言它能涨到云端。泡沫明显，强烈建议逢高分批套现退场，天才交易员们！"
-                elif mci >= 61:
-                    advice = "股价反弹，朋友圈里的微商和炒客都在吹嘘资产金融属性。注意保护好你的核心利润，防范机构高位收网，建议考虑减仓。"
-                elif mci >= 41:
-                    advice = "茅台在平稳波动，街头没有任何异常的买卖动静。建议继续保持仓位不动，吃瓜看戏。"
-                elif mci >= 21:
-                    advice = "低迷横盘，大伙表示‘传统股已经没有成长性了’。大盘情绪偏冷，适合中长线分批逐步建仓。"
-                else:
-                    advice = "直线下跌，大伙惊呼‘信仰已死，以后不碰实体股了’。逆向思维：高端消费资产被极度超卖，正是左侧大举分批买入的良机！"
-            else: # Crypto (BTC/ETH) or general
-                if mci >= 81:
-                    advice = "市场彻底疯了！每个人都自以为是下一个暴富股神，狂晒千倍神话收益，连办公楼底下的快餐阿姨都在问你怎么开户！狂热度炸裂！快火速抛售退场！"
-                elif mci >= 61:
-                    advice = "韭菜们开始打听如何注册去中心化钱包，热度正在上升。空气里满是危险的本金炮灰味，建议提高警惕，保护利润，分批高抛。"
-                elif mci >= 41:
-                    advice = "市场处于正常盘整区间，大伙都在各自按部就班生活。建议继续持有，静观其变。"
-                elif mci >= 21:
-                    advice = "筹码无人问津，甚至有人为了生活费把交易账户清算注销了。逆向而言，这往往是中线分批建仓的宁静良机。"
-                else:
-                    advice = "大伙已割肉离场，频道里死寂一片，上次提到这名字的家伙已经被交易所清算归零。极度深寒正是主力的吸筹坑，买入信号极为强烈！"
-            
-        mama_reaction = describe_mama_reaction(mci, quotes_json)
+        asset_texts = report_texts.get("assets", {}).get(sym, {})
+        advice = asset_texts.get("advice", level.get("signal", ""))
+        mama_reaction = asset_texts.get("quote", "")
         
         dims_data = {}
         for dname in ["fear_greed", "search_interest", "derivatives", "price_trend", "social_sentiment"]:
@@ -616,20 +724,8 @@ def generate_web_report(mci_data, config, quotes_json=None):
         })
         
     correlation = detect_correlation(mci_data.get("assets", []))
-    
-    tomorrow_watch = []
-    if p_mci is None:
-        tomorrow_watch.append("暂无足够数据评估明日方向。")
-    elif p_mci >= 61:
-        tomorrow_watch.append("当前贪婪度过热。明天重点关注社交媒体是否出现新的散户跑步开户、甚至抵押家当梭哈的信号。")
-        tomorrow_watch.append("如果组合 MCI 突破 80%，需坚决执行止盈减仓计划，保住你可怜的本金。")
-    elif p_mci <= 40:
-        tomorrow_watch.append("韭菜退潮。指数进入深度超卖的恐慌底部，密切关注主力低吸企稳信号。")
-        tomorrow_watch.append("若组合 MCI 跌破 20%，这是散户与游资逆袭重仓的绝佳黄金坑。")
-    else:
-        tomorrow_watch.append("当前市场情绪中性。以静制动，捂紧你的钱包，切忌盲目追高或割肉。")
-        
-    golden_quote = random.choice(REVIEW_GOLDEN_QUOTES)
+    tomorrow_watch = report_texts.get("tomorrow_watch", [])
+    golden_quote = report_texts.get("golden_quote", "")
     
     web_data = {
         "timestamp": datetime.now().isoformat(),
@@ -672,20 +768,23 @@ def main():
         except:
             pass
 
+    # Fetch report texts (via DeepSeek LLM or fallback)
+    report_texts = get_report_texts(mci_data, config, quotes_json)
+
     if args.mode == "review":
-        report = generate_review_report(mci_data, config, quotes_json)
+        report = generate_review_report(mci_data, config, report_texts)
     else:
-        report = generate_text_report(mci_data, config, quotes_json)
+        report = generate_text_report(mci_data, config, report_texts)
     print(report)
 
     try:
         update_history(mci_data)
-        generate_web_report(mci_data, config, quotes_json)
+        generate_web_report(mci_data, config, report_texts)
     except Exception as e:
         print(f"[WARN] 自动更新 Web 报表失败: {e}", file=sys.stderr)
 
     if args.html:
-        html = generate_html_report(mci_data, config, quotes_json)
+        html = generate_html_report(mci_data, config, report_texts)
         os.makedirs(os.path.dirname(args.html), exist_ok=True)
         with open(args.html, 'w', encoding='utf-8') as f:
             f.write(html)

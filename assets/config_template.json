@@ -1,5 +1,11 @@
 {
   "sass_level": "medium",
+  "llm_config": {
+    "enabled": true,
+    "model_name": "deepseek-chat",
+    "api_base": "https://api.deepseek.com/v1",
+    "deepseek_api_key": ""
+  },
   "crypto_assets": [
     {
       "coin_id": "bitcoin",
