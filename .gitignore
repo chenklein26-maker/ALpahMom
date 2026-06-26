@@ -34,3 +34,7 @@ desktop.ini
 
 # Config with personal settings
 alpha_mom_config.json
+
+# Session & output temp folders
+.session_tmps/
+output/

@@ -10,6 +10,18 @@ import os
 import sys
 from datetime import datetime
 
+# Windows encoding support
+if sys.stdout.encoding != 'utf-8':
+    try:
+        sys.stdout.reconfigure(encoding='utf-8')
+    except AttributeError:
+        pass
+if sys.stderr.encoding != 'utf-8':
+    try:
+        sys.stderr.reconfigure(encoding='utf-8')
+    except AttributeError:
+        pass
+
 # ─── 权重配置 ─────────────────────────────────────────────────
 DEFAULT_WEIGHTS = {
     "fear_greed": 0.20,
@@ -87,17 +99,30 @@ def compute_mci_for_asset(asset_data):
     # 自适应权重归一化
     norm_weights, unavailable = normalize_weights(dims)
 
-    # 加权求和
-    mci = 0
-    for dim_name, w in norm_weights.items():
-        s = dim_scores[dim_name]["score"]
-        if s is not None:
-            mci += w * s
+    # 检查是否有任何可用数据
+    has_any_score = any(dim_scores[d]["available"] for d in dim_scores)
 
-    mci = round(max(0, min(100, mci)), 1)
-
-    # 信号等级
-    level = get_signal_level(mci)
+    if not has_any_score:
+        mci = None
+        level = {
+            "min": 0,
+            "max": 0,
+            "level": "无数据",
+            "icon": "❓",
+            "mama_status": "数据源全部缺失，无法计算拥挤度",
+            "signal": "暂无信号",
+            "signal_icon": "⚪"
+        }
+    else:
+        # 加权求和
+        mci = 0
+        for dim_name, w in norm_weights.items():
+            s = dim_scores[dim_name]["score"]
+            if s is not None:
+                mci += w * s
+        mci = round(max(0, min(100, mci)), 1)
+        # 信号等级
+        level = get_signal_level(mci)
 
     return {
         "symbol": asset_data.get("symbol", ""),
@@ -115,10 +140,27 @@ def compute_portfolio_mci(asset_results):
     """多标的加权组合 MCI"""
     if not asset_results:
         return None
-    total_weight = sum(a["weight"] for a in asset_results)
+    
+    # 过滤出有有效 MCI 的资产
+    valid_assets = [a for a in asset_results if a["mci"] is not None]
+    if not valid_assets:
+        return {
+            "mci": None,
+            "level": {
+                "min": 0,
+                "max": 0,
+                "level": "无数据",
+                "icon": "❓",
+                "mama_status": "所有资产均无可用数据，无法评估组合拥挤度",
+                "signal": "暂无信号",
+                "signal_icon": "⚪"
+            }
+        }
+
+    total_weight = sum(a["weight"] for a in valid_assets)
     if total_weight == 0:
         total_weight = 1
-    portfolio_mci = sum(a["mci"] * a["weight"] for a in asset_results) / total_weight
+    portfolio_mci = sum(a["mci"] * a["weight"] for a in valid_assets) / total_weight
     portfolio_mci = round(portfolio_mci, 1)
     level = get_signal_level(portfolio_mci)
     return {
@@ -175,9 +217,11 @@ def main():
     # 终端摘要
     print("\n" + "=" * 50, file=sys.stderr)
     if portfolio:
-        print(f"组合 MCI: {portfolio['mci']}% {portfolio['level']['icon']} {portfolio['level']['level']}", file=sys.stderr)
+        mci_val = f"{portfolio['mci']}%" if portfolio['mci'] is not None else "N/A"
+        print(f"组合 MCI: {mci_val} {portfolio['level']['icon']} {portfolio['level']['level']}", file=sys.stderr)
     for a in all_assets:
-        print(f"  {a['name']:12s}  MCI={a['mci']:5.1f}%  {a['level']['icon']} {a['level']['signal']}", file=sys.stderr)
+        mci_str = f"{a['mci']}%" if a['mci'] is not None else "N/A"
+        print(f"  {a['name']:12s}  MCI={mci_str:6s}  {a['level']['icon']} {a['level']['signal']}", file=sys.stderr)
     print("=" * 50, file=sys.stderr)
 
 if __name__ == "__main__":

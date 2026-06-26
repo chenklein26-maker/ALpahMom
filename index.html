@@ -1,0 +1,2074 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AlphaMom - 宝妈反买量化仪表盘</title>
+<!-- 引入 Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<!-- 引入 Inter 字体 -->
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+    --bg-window: #f4f5f9;
+    --bg-sidebar: #ffffff;
+    --bg-main: #f8fafc;
+    --card-bg: #ffffff;
+    --card-border: #e2e8f0;
+    
+    --text-main: #0f172a;
+    --text-secondary: #475569;
+    --text-muted: #64748b;
+    --text-light: #94a3b8;
+    
+    --primary-color: #6366f1;
+    --accent-purple: #8b5cf6;
+    
+    --color-freeze: #3b82f6;
+    --color-cold: #06b6d4;
+    --color-neutral: #10b981;
+    --color-hot: #f59e0b;
+    --color-lava: #ef4444;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    background: radial-gradient(circle at 50% 50%, #e2e8f0 0%, #cbd5e1 100%);
+    color: var(--text-main);
+    min-height: 100vh;
+    padding: 30px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+/* macOS App Window Container */
+.mac-window {
+    width: 100%;
+    max-width: 1360px;
+    height: 820px;
+    background: var(--bg-main);
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 16px;
+    box-shadow: 0 30px 60px -15px rgba(0, 0, 0, 0.15), 0 0 1px 1px rgba(255, 255, 255, 0.8) inset;
+    overflow: hidden;
+    display: grid;
+    grid-template-columns: 260px 1fr;
+}
+
+@media (max-width: 1024px) {
+    .mac-window {
+        grid-template-columns: 1fr;
+        height: auto;
+    }
+}
+
+/* Sidebar Styling */
+.sidebar {
+    background: var(--bg-sidebar);
+    border-right: 1px solid var(--card-border);
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    height: 100%;
+}
+
+@media (max-width: 1024px) {
+    .sidebar {
+        border-right: none;
+        border-bottom: 1px solid var(--card-border);
+        height: auto;
+        gap: 20px;
+    }
+}
+
+.sidebar-top {
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+}
+
+/* macOS Close/Minimize/Zoom Traffic Lights */
+.mac-controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+
+.mac-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    position: relative;
+    cursor: pointer;
+}
+.mac-dot.close { background-color: #ff5f56; border: 0.5px solid #e0443e; }
+.mac-dot.minimize { background-color: #ffbd2e; border: 0.5px solid #dfa224; }
+.mac-dot.zoom { background-color: #27c93f; border: 0.5px solid #1aab29; }
+
+/* Sidebar Logo */
+.logo-container {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.logo-icon {
+    width: 36px;
+    height: 36px;
+    background: linear-gradient(135deg, var(--primary-color), var(--accent-purple));
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: 800;
+    font-size: 18px;
+    box-shadow: 0 4px 10px rgba(99, 102, 241, 0.25);
+}
+
+.logo-text-wrapper {
+    display: flex;
+    flex-direction: column;
+}
+
+.logo-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text-main);
+    letter-spacing: -0.5px;
+}
+
+.logo-subtitle {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-weight: 500;
+}
+
+/* Sidebar Menu */
+.sidebar-menu {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.menu-item a {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    color: var(--text-secondary);
+    text-decoration: none;
+    font-size: 13px;
+    font-weight: 500;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+}
+
+.menu-item a svg {
+    width: 16px;
+    height: 16px;
+    stroke: currentColor;
+    fill: none;
+    stroke-width: 2;
+    transition: stroke 0.2s;
+}
+
+.menu-item.active a {
+    background: linear-gradient(135deg, var(--primary-color), var(--accent-purple));
+    color: #ffffff;
+    font-weight: 600;
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.2);
+}
+
+.menu-item:not(.active) a:hover {
+    background: #f1f5f9;
+    color: var(--text-main);
+}
+
+/* Quote Bubble Card */
+.quote-card {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+    padding: 18px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.02);
+    position: relative;
+}
+
+.quote-icon {
+    font-size: 28px;
+    line-height: 1;
+    color: var(--accent-purple);
+    font-weight: bold;
+    margin-bottom: 4px;
+    opacity: 0.8;
+}
+
+.quote-text {
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--text-secondary);
+    font-style: italic;
+    margin-bottom: 12px;
+}
+
+.quote-author {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-weight: 500;
+    text-align: right;
+}
+
+/* Sidebar Footer */
+.sidebar-footer {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 16px;
+    font-weight: 500;
+}
+
+.update-dot {
+    color: var(--color-neutral);
+    font-size: 12px;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% { opacity: 0.5; }
+    50% { opacity: 1; }
+    100% { opacity: 0.5; }
+}
+
+/* Main Panel Styling */
+.main-panel {
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    overflow-y: auto;
+    height: 100%;
+}
+
+/* Main Panel Header */
+.panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.header-title-box {
+    display: flex;
+    flex-direction: column;
+}
+
+.panel-title {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--text-main);
+    letter-spacing: -0.5px;
+}
+
+.panel-subtitle {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 2px;
+}
+
+.header-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.btn-secondary {
+    background: #ffffff;
+    border: 1px solid var(--card-border);
+    color: var(--text-secondary);
+    padding: 8px 14px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+}
+
+.btn-secondary:hover {
+    background: #f8fafc;
+    color: var(--text-main);
+    border-color: #cbd5e1;
+    transform: translateY(-1px);
+}
+
+.date-badge {
+    background: #ffffff;
+    border: 1px solid var(--card-border);
+    color: var(--text-secondary);
+    padding: 8px 14px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+}
+
+.notification-bell {
+    width: 36px;
+    height: 36px;
+    background: #ffffff;
+    border: 1px solid var(--card-border);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    cursor: pointer;
+    color: var(--text-secondary);
+    transition: all 0.2s ease;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+}
+
+.notification-bell:hover {
+    background: #f8fafc;
+    color: var(--text-main);
+    transform: translateY(-1px);
+}
+
+.bell-badge {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    background: var(--color-lava);
+    color: white;
+    font-size: 9px;
+    font-weight: 700;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1.5px solid white;
+}
+
+/* Top Summary Cards Grid */
+.top-cards-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+}
+
+@media (max-width: 1200px) {
+    .top-cards-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 600px) {
+    .top-cards-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.top-card {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+    padding: 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.top-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.04);
+}
+
+.top-card-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.top-card-icon {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+}
+
+.top-card-icon.blue { background: #eff6ff; color: var(--color-freeze); }
+.top-card-icon.purple { background: #faf5ff; color: var(--accent-purple); }
+.top-card-icon.orange { background: #fff7ed; color: var(--color-hot); }
+.top-card-icon.indigo { background: #e0e7ff; color: var(--primary-color); }
+
+.top-card-info {
+    display: flex;
+    flex-direction: column;
+}
+
+.top-card-label {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-weight: 600;
+}
+
+.top-card-value {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text-main);
+    margin: 2px 0;
+}
+
+.top-card-subtext {
+    font-size: 11px;
+    font-weight: 500;
+}
+
+.top-card-subtext.up { color: var(--color-neutral); }
+.top-card-subtext.down { color: var(--color-lava); }
+
+.top-card-right {
+    width: 80px;
+    height: 40px;
+}
+
+.sparkline-canvas {
+    width: 100%;
+    height: 100%;
+}
+
+/* Detail Section Grid */
+.detail-section-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text-main);
+    margin-bottom: 12px;
+}
+
+.assets-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+}
+
+@media (max-width: 1200px) {
+    .assets-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 768px) {
+    .assets-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Asset Detail Card */
+.asset-card {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.asset-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.04);
+}
+
+.asset-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.asset-title-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.asset-icon-wrapper {
+    font-size: 16px;
+}
+
+.asset-name-label {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text-main);
+}
+
+.asset-symbol-label {
+    font-size: 11px;
+    color: var(--text-muted);
+    background: #f1f5f9;
+    padding: 1px 5px;
+    border-radius: 4px;
+    font-weight: 600;
+}
+
+.asset-level-badge {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 20px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.asset-price-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+}
+
+.asset-price-val {
+    font-size: 20px;
+    font-weight: 800;
+    color: var(--text-main);
+}
+
+.asset-price-change {
+    font-size: 12px;
+    font-weight: 600;
+}
+.asset-price-change.up { color: var(--color-neutral); }
+.asset-price-change.down { color: var(--color-freeze); }
+
+/* Dimensions Table */
+.dims-container {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.dim-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 11px;
+    gap: 8px;
+}
+
+.dim-name-label {
+    width: 60px;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.dim-bar-bg {
+    flex: 1;
+    height: 6px;
+    background: #f1f5f9;
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.dim-bar-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.8s ease;
+}
+
+.dim-score-label {
+    width: 24px;
+    text-align: right;
+    font-weight: 600;
+    color: var(--text-main);
+}
+
+/* Suggestion Box */
+.advice-box {
+    background: #fffbeb;
+    border: 1px solid #fef3c7;
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 11px;
+    line-height: 1.5;
+    color: #b45309;
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+}
+
+.advice-icon {
+    font-size: 14px;
+    flex-shrink: 0;
+    margin-top: 1px;
+}
+
+/* History Chart Card */
+.history-card {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+}
+
+.chart-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.chart-title-label {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text-main);
+}
+
+.chart-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.chart-container {
+    position: relative;
+    height: 250px;
+    width: 100%;
+}
+
+/* Poster Modal Styling */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(15, 23, 42, 0.6);
+    backdrop-filter: blur(8px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.modal-container {
+    width: 90%;
+    max-width: 440px;
+    background: #ffffff;
+    border: 1px solid var(--card-border);
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px;
+    gap: 16px;
+    animation: scaleUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes scaleUp {
+    from { transform: scale(0.95); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+}
+
+#poster-canvas {
+    width: 100%;
+    max-width: 360px;
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+    background: #ffffff;
+    border: 1px solid var(--card-border);
+}
+
+.modal-actions {
+    display: flex;
+    gap: 12px;
+    width: 100%;
+    margin-top: 4px;
+}
+
+.modal-actions button {
+    flex: 1;
+    padding: 10px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    transition: all 0.2s ease;
+}
+
+.btn-modal-close {
+    background: #f1f5f9;
+    color: var(--text-secondary);
+}
+
+.btn-modal-close:hover {
+    background: #e2e8f0;
+    color: var(--text-main);
+}
+
+.btn-modal-save {
+    background: var(--primary-color);
+    color: white;
+    box-shadow: 0 4px 10px rgba(99, 102, 241, 0.2);
+}
+
+.btn-modal-save:hover {
+    background: #4f46e5;
+    transform: translateY(-1px);
+}
+
+/* Footer styling */
+.page-footer {
+    margin-top: 16px;
+    font-size: 11px;
+    color: var(--text-muted);
+    text-align: center;
+    line-height: 1.6;
+    font-weight: 500;
+}
+
+/* Dual Mode Toggle & Elements Styles */
+.segmented-control {
+    display: flex;
+    position: relative;
+    background: rgba(0, 0, 0, 0.05);
+    border-radius: 8px;
+    padding: 2px;
+    width: 170px;
+    border: 1px solid rgba(0, 0, 0, 0.03);
+}
+
+.segmented-control input[type="radio"] {
+    display: none;
+}
+
+.segment-label {
+    flex: 1;
+    text-align: center;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 5px 0;
+    cursor: pointer;
+    z-index: 1;
+    color: var(--text-secondary);
+    transition: color 0.2s ease;
+}
+
+.segmented-control input[type="radio"]:checked + .segment-label {
+    color: var(--text-main);
+}
+
+.control-glider {
+    position: absolute;
+    height: calc(100% - 4px);
+    width: calc(50% - 2px);
+    background: #ffffff;
+    border-radius: 6px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 1px rgba(0, 0, 0, 0.03);
+    transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 0;
+    top: 2px;
+    left: 2px;
+}
+
+#mode-pro-radio:checked ~ .control-glider {
+    transform: translateX(100%);
+}
+
+/* Z-Score Badge styling */
+.dim-zscore-badge {
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin-left: 6px;
+}
+.dim-zscore-badge.z-neutral {
+    background: #f1f5f9;
+    color: var(--text-muted);
+}
+.dim-zscore-badge.z-extreme-high {
+    background: #fef2f2;
+    color: var(--color-lava);
+}
+.dim-zscore-badge.z-extreme-low {
+    background: #eff6ff;
+    color: var(--color-freeze);
+}
+
+/* Lite Hero Card */
+.lite-action-panel {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+    padding: 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.01);
+    gap: 20px;
+    margin-top: 16px;
+}
+
+@media (max-width: 768px) {
+    .lite-action-panel {
+        flex-direction: column;
+        align-items: stretch;
+    }
+}
+
+.hero-left {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.hero-icon {
+    font-size: 40px;
+    line-height: 1;
+    animation: pulse-slow 3s infinite;
+}
+
+@keyframes pulse-slow {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.06); }
+    100% { transform: scale(1); }
+}
+
+.hero-text-box {
+    display: flex;
+    flex-direction: column;
+}
+
+.hero-subtitle {
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--text-light);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.hero-title {
+    font-size: 26px;
+    font-weight: 800;
+    color: var(--text-main);
+    margin-top: 2px;
+    letter-spacing: -0.5px;
+}
+
+.hero-middle {
+    flex: 1;
+    max-width: 480px;
+}
+
+.hero-quote-box {
+    position: relative;
+    background: #f8fafc;
+    border-radius: 10px;
+    padding: 12px 16px 12px 36px;
+    border: 1px solid rgba(0,0,0,0.02);
+}
+
+.hero-quote-box .quote-symbol {
+    position: absolute;
+    left: 10px;
+    top: -2px;
+    font-size: 40px;
+    font-family: Georgia, serif;
+    color: rgba(99, 102, 241, 0.12);
+    line-height: 1;
+}
+
+.hero-quote-text {
+    font-size: 13px;
+    color: var(--text-secondary);
+    font-weight: 500;
+    line-height: 1.45;
+}
+
+.btn-primary-mac {
+    background: linear-gradient(135deg, var(--primary-color), var(--accent-purple));
+    border: none;
+    color: #ffffff;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.25);
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+.btn-primary-mac:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(99, 102, 241, 0.35);
+}
+
+/* Pro Split Row layout */
+.dashboard-row-split {
+    margin-top: 16px;
+}
+
+@media (max-width: 1024px) {
+    .dashboard-row-split {
+        grid-template-columns: 1fr !important;
+    }
+}
+
+/* Weights Config Card */
+.weights-config-card {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.01);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    height: 100%;
+}
+
+.weights-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px dashed var(--card-border);
+    padding-bottom: 8px;
+}
+
+.weights-card-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-main);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.btn-text-link {
+    background: none;
+    border: none;
+    color: var(--primary-color);
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+.btn-text-link:hover {
+    background: #f1f5f9;
+}
+
+.sliders-container {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.slider-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.slider-label {
+    width: 110px;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
+
+.mac-slider {
+    flex: 1;
+    -webkit-appearance: none;
+    height: 4px;
+    background: #f1f5f9;
+    border-radius: 2px;
+    outline: none;
+}
+
+.mac-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--primary-color);
+    cursor: pointer;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    transition: transform 0.1s ease;
+}
+
+.mac-slider::-webkit-slider-thumb:hover {
+    transform: scale(1.2);
+}
+
+.slider-val-label {
+    width: 28px;
+    text-align: right;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-muted);
+}
+
+.weights-footer-alert {
+    font-size: 10px;
+    color: var(--text-muted);
+    background: #f8fafc;
+    padding: 8px 10px;
+    border-radius: 6px;
+    border: 1px solid rgba(0,0,0,0.01);
+}
+
+.mac-window.mode-lite .pro-only {
+    display: none !important;
+}
+.mac-window.mode-pro .lite-only {
+    display: none !important;
+}
+</style>
+</head>
+<body>
+
+<div class="mac-window mode-lite">
+    <!-- Sidebar Column -->
+    <div class="sidebar">
+        <div class="sidebar-top">
+            <!-- Traffic Lights -->
+            <div class="mac-controls">
+                <div class="mac-dot close"></div>
+                <div class="mac-dot minimize"></div>
+                <div class="mac-dot zoom"></div>
+            </div>
+            
+            <!-- Logo -->
+            <div class="logo-container">
+                <div class="logo-icon">👩‍👦</div>
+                <div class="logo-text-wrapper">
+                    <span class="logo-title">AlphaMom</span>
+                    <span class="logo-subtitle">宝妈反买量化仪表盘</span>
+                </div>
+            </div>
+            
+            <!-- Menu Navigation -->
+            <ul class="sidebar-menu">
+                <li class="menu-item active">
+                    <a href="#">
+                        <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+                        总览看板
+                    </a>
+                </li>
+                <li class="menu-item">
+                    <a href="#">
+                        <svg viewBox="0 0 24 24"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
+                        市场情报
+                    </a>
+                </li>
+                <li class="menu-item">
+                    <a href="#">
+                        <svg viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line></svg>
+                        组合追踪
+                    </a>
+                </li>
+                <li class="menu-item">
+                    <a href="#">
+                        <svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                        信号监控
+                    </a>
+                </li>
+                <li class="menu-item">
+                    <a href="#">
+                        <svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+                        历史分析
+                    </a>
+                </li>
+                <li class="menu-item">
+                    <a href="#">
+                        <svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+                        预警中心
+                    </a>
+                </li>
+                <li class="menu-item">
+                    <a href="#">
+                        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                        设置中心
+                    </a>
+                </li>
+            </ul>
+        </div>
+        
+        <!-- Sidebar Bottom Info & Quote -->
+        <div style="display:flex; flex-direction:column; gap:16px;">
+            <!-- Golden Quote Bubble -->
+            <div class="quote-card">
+                <div class="quote-icon">“</div>
+                <div class="quote-text" id="sidebar-quote-text">
+                    History does not repeat, but mamas do - at the end of every bull market stands a freshly-registered mama.
+                </div>
+                <div class="quote-author">— AlphaMom</div>
+            </div>
+            
+            <!-- Update time footer -->
+            <div class="sidebar-footer">
+                <span class="update-dot">●</span>
+                <span id="update-time-text">数据更新: 5分钟前</span>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Main Content Panel -->
+    <div class="main-panel">
+        <!-- Panel Header -->
+        <div class="panel-header">
+            <div class="header-title-box">
+                <h1 class="panel-title">总览看板</h1>
+                <span class="panel-subtitle">实时市场情绪与宝妈反买信号总览</span>
+            </div>
+            <div class="header-controls">
+                <!-- Segmented Control for Mode Select -->
+                <div class="segmented-control">
+                    <input type="radio" id="mode-lite-radio" name="mode-select" value="lite" checked onclick="switchMode('lite')">
+                    <label for="mode-lite-radio" class="segment-label">Lite 模式</label>
+                    <input type="radio" id="mode-pro-radio" name="mode-select" value="pro" onclick="switchMode('pro')">
+                    <label for="mode-pro-radio" class="segment-label">Pro 模式</label>
+                    <span class="control-glider"></span>
+                </div>
+                
+                <button class="btn-secondary" onclick="loadData()">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+                    刷新数据
+                </button>
+                <div class="date-badge">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                    <span id="date-range-text">2024-04-20 ~ 2024-07-20</span>
+                </div>
+                <div class="notification-bell" onclick="showPoster()">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+                    <span class="bell-badge">3</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Top Summary Cards Row -->
+        <div class="top-cards-grid">
+            <!-- Card 1: 组合狂热度 -->
+            <div class="top-card">
+                <div class="top-card-left">
+                    <div class="top-card-icon blue">📈</div>
+                    <div class="top-card-info">
+                        <span class="top-card-label">组合狂热度</span>
+                        <span class="top-card-value" id="top-card-mci-val">15%</span>
+                        <span class="top-card-subtext up" id="top-card-mci-change">较昨日 +2.4% ↑</span>
+                    </div>
+                </div>
+                <div class="top-card-right">
+                    <canvas class="sparkline-canvas" id="sparkline-mci"></canvas>
+                </div>
+            </div>
+            
+            <!-- Card 2: 总持仓市值 -->
+            <div class="top-card">
+                <div class="top-card-left">
+                    <div class="top-card-icon purple">📊</div>
+                    <div class="top-card-info">
+                        <span class="top-card-label">总持仓市值</span>
+                        <span class="top-card-value">$ 152,430</span>
+                        <span class="top-card-subtext up" style="color: var(--color-neutral);">较昨日 +1.87% ↑</span>
+                    </div>
+                </div>
+                <div class="top-card-right">
+                    <canvas class="sparkline-canvas" id="sparkline-value"></canvas>
+                </div>
+            </div>
+            
+            <!-- Card 3: BTC 价格 -->
+            <div class="top-card">
+                <div class="top-card-left">
+                    <div class="top-card-icon orange">₿</div>
+                    <div class="top-card-info">
+                        <span class="top-card-label">BTC 价格</span>
+                        <span class="top-card-value" id="top-card-btc-val">$ 58,721</span>
+                        <span class="top-card-subtext down" id="top-card-btc-change">较昨日 -0.73% ↓</span>
+                    </div>
+                </div>
+                <div class="top-card-right">
+                    <canvas class="sparkline-canvas" id="sparkline-btc"></canvas>
+                </div>
+            </div>
+            
+            <!-- Card 4: ETH 价格 -->
+            <div class="top-card">
+                <div class="top-card-left">
+                    <div class="top-card-icon indigo">Ξ</div>
+                    <div class="top-card-info">
+                        <span class="top-card-label">ETH 价格</span>
+                        <span class="top-card-value" id="top-card-eth-val">$ 3,152</span>
+                        <span class="top-card-subtext down" id="top-card-eth-change">较昨日 -1.21% ↓</span>
+                    </div>
+                </div>
+                <div class="top-card-right">
+                    <canvas class="sparkline-canvas" id="sparkline-eth"></canvas>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Detail Grid Section -->
+        <div>
+            <h2 class="detail-section-title">市场情报明细</h2>
+            <div class="assets-grid" id="assets-grid-container">
+                <!-- Dynamic cards populated here -->
+            </div>
+        </div>
+        
+        <!-- Lite Mode Hero Panel -->
+        <div class="lite-only lite-action-panel card-glow" id="lite-action-hero">
+            <div class="hero-left">
+                <span class="hero-icon" id="lite-hero-icon">😐</span>
+                <div class="hero-text-box">
+                    <span class="hero-subtitle">组合大动作信号建议</span>
+                    <h2 class="hero-title" id="lite-hero-signal">获取数据中...</h2>
+                </div>
+            </div>
+            <div class="hero-middle">
+                <div class="hero-quote-box">
+                    <span class="quote-symbol">“</span>
+                    <p class="hero-quote-text" id="lite-hero-quote">等待加载数据中，请稍候。</p>
+                </div>
+            </div>
+            <button class="btn-primary-mac" onclick="showPoster()">
+                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                 生成今日情绪海报
+            </button>
+        </div>
+
+        <!-- Pro Mode Split Section -->
+        <div class="pro-only dashboard-row-split" style="display: grid; grid-template-columns: 340px 1fr; gap: 16px;">
+            <!-- Weights Panel -->
+            <div class="weights-config-card">
+                <div class="weights-header-row">
+                    <h3 class="weights-card-title">🔬 MCI 自适应权重微调</h3>
+                    <button class="btn-text-link" onclick="resetWeights()">恢复默认</button>
+                </div>
+                <div class="sliders-container">
+                    <div class="slider-row">
+                        <span class="slider-label">😱 恐惧贪婪</span>
+                        <input type="range" class="mac-slider" id="weight-fg" min="0" max="100" value="20" oninput="recalculateMci()">
+                        <span class="slider-val-label" id="val-fg">20%</span>
+                    </div>
+                    <div class="slider-row">
+                        <span class="slider-label">🔍 搜索热度</span>
+                        <input type="range" class="mac-slider" id="weight-search" min="0" max="100" value="20" oninput="recalculateMci()">
+                        <span class="slider-val-label" id="val-search">20%</span>
+                    </div>
+                    <div class="slider-row">
+                        <span class="slider-label">📈 衍生杠杆</span>
+                        <input type="range" class="mac-slider" id="weight-leverage" min="0" max="100" value="25" oninput="recalculateMci()">
+                        <span class="slider-val-label" id="val-leverage">25%</span>
+                    </div>
+                    <div class="slider-row">
+                        <span class="slider-label">📉 趋势偏离</span>
+                        <input type="range" class="mac-slider" id="weight-trend" min="0" max="100" value="20" oninput="recalculateMci()">
+                        <span class="slider-val-label" id="val-trend">20%</span>
+                    </div>
+                    <div class="slider-row">
+                        <span class="slider-label">💬 社区情绪</span>
+                        <input type="range" class="mac-slider" id="weight-social" min="0" max="100" value="15" oninput="recalculateMci()">
+                        <span class="slider-val-label" id="val-social">15%</span>
+                    </div>
+                </div>
+                <div class="weights-footer-alert" id="weights-total-label">
+                   💡 拉动滑块会<strong>就地重分配</strong>权重。权重之和: 100%
+                </div>
+            </div>
+
+            <!-- History Chart -->
+            <div class="history-card" style="margin-top:0;">
+                <div class="chart-header-row">
+                    <h3 class="chart-title-label">历史回测与情绪偏离</h3>
+                    <div class="chart-controls">
+                        <select class="btn-secondary" style="outline:none; cursor:pointer;" id="chart-time-select">
+                            <option>近3个月</option>
+                            <option>近6个月</option>
+                            <option>近1年</option>
+                        </select>
+                        <button class="btn-secondary" onclick="showPoster()">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="chart-container">
+                    <canvas id="history-chart"></canvas>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Footer Info -->
+        <div class="page-footer">
+            ⚠️ 免责声明: 本工具仅供娱乐与辅助参考,不构成投资建议。宝妈反买,盈亏自负。<br>
+            AlphaMom — 外行看个乐，内行看门道。
+        </div>
+    </div>
+</div>
+
+<!-- Poster Modal Overlay -->
+<div class="modal-overlay" id="poster-modal">
+    <div class="modal-container">
+        <h3 style="font-weight:700; font-size:16px; color:var(--text-main);">📋 AlphaMom 宝妈情报海报</h3>
+        <canvas id="poster-canvas" width="600" height="900"></canvas>
+        <p style="font-size:11px; color:var(--text-muted); text-align:center; margin: 4px 0 8px 0;">手机长按海报可保存图片，或点击保存海报按钮下载</p>
+        <div class="modal-actions">
+            <button class="btn-modal-close" onclick="closePoster()">关闭</button>
+            <button class="btn-modal-save" onclick="downloadPoster()">下载海报</button>
+        </div>
+    </div>
+</div>
+
+<script>
+let mciData = null;
+let rawMciData = null; // Deep clone backup of original web_report.json
+let historyData = null;
+let historyChart = null;
+
+const defaultWeights = {
+    fg: 20,
+    search: 20,
+    leverage: 25,
+    trend: 20,
+    social: 15
+};
+
+// Level definitions for dynamic signal level calculation
+const signalLevels = [
+    {min: 0,  max: 20,  level: "冰封区", icon: "🧊", mama_status: "宝妈早已割肉离场,群里鸦雀无声",  signal: "买入信号",  signal_icon: "🟢"},
+    {min: 21, max: 40,  level: "寒冷区", icon: "❄️", mama_status: "宝妈偶尔提起但兴趣寥寥",          signal: "建仓信号",  signal_icon: "🔵"},
+    {min: 41, max: 60,  level: "温和区", icon: "😐", mama_status: "正常市场状态,宝妈无异常举动",      signal: "持有",      signal_icon: "⚪"},
+    {min: 61, max: 80,  level: "升温区", icon: "🔥", mama_status: "宝妈开始打听,群里有人晒单",        signal: "止盈信号",  signal_icon: "🟡"},
+    {min: 81, max: 100, level: "熔岩区", icon: "🌋", mama_status: "宝妈跑步进场,连你三姑都在推荐",    signal: "卖出信号",  signal_icon: "🔴"}
+];
+
+function getSignalLevelJS(mci) {
+    if (mci === null || mci === undefined) {
+        return { level: "无数据", icon: "❓", signal: "暂无信号", signal_icon: "⚪", mama_status: "暂无数据" };
+    }
+    for (const lvl of signalLevels) {
+        if (mci >= lvl.min && mci <= lvl.max) {
+            return lvl;
+        }
+    }
+    return signalLevels[2];
+}
+
+function switchMode(mode) {
+    const win = document.querySelector('.mac-window');
+    if (mode === 'lite') {
+        win.classList.remove('mode-pro');
+        win.classList.add('mode-lite');
+    } else {
+        win.classList.remove('mode-lite');
+        win.classList.add('mode-pro');
+    }
+    
+    // Auto re-render chart/sparkline sizes on layout change
+    if (historyChart) {
+        setTimeout(() => {
+            historyChart.resize();
+            renderChart();
+        }, 100);
+    }
+}
+
+function resetWeights() {
+    document.getElementById('weight-fg').value = defaultWeights.fg;
+    document.getElementById('weight-search').value = defaultWeights.search;
+    document.getElementById('weight-leverage').value = defaultWeights.leverage;
+    document.getElementById('weight-trend').value = defaultWeights.trend;
+    document.getElementById('weight-social').value = defaultWeights.social;
+    recalculateMci();
+}
+
+function recalculateMci() {
+    if (!mciData || !rawMciData) return;
+    
+    const fgVal = parseFloat(document.getElementById('weight-fg').value);
+    const searchVal = parseFloat(document.getElementById('weight-search').value);
+    const leverageVal = parseFloat(document.getElementById('weight-leverage').value);
+    const trendVal = parseFloat(document.getElementById('weight-trend').value);
+    const socialVal = parseFloat(document.getElementById('weight-social').value);
+    
+    // Update Slider UI labels
+    document.getElementById('val-fg').innerText = `${fgVal}%`;
+    document.getElementById('val-search').innerText = `${searchVal}%`;
+    document.getElementById('val-leverage').innerText = `${leverageVal}%`;
+    document.getElementById('val-trend').innerText = `${trendVal}%`;
+    document.getElementById('val-social').innerText = `${socialVal}%`;
+    
+    const S = fgVal + searchVal + leverageVal + trendVal + socialVal;
+    document.getElementById('weights-total-label').innerHTML = `💡 拉动滑块会<strong>就地重分配</strong>权重。权重之和: ${S}%${S !== 100 ? ' (自动按比例归一)' : ''}`;
+    
+    const baseWeights = {
+        fear_greed: fgVal,
+        search_interest: searchVal,
+        derivatives: leverageVal,
+        price_trend: trendVal,
+        social_sentiment: socialVal
+    };
+    
+    let totalAssetMci = 0;
+    let validAssetCount = 0;
+    
+    mciData.assets.forEach(asset => {
+        // Read original dimension data from read-only rawMciData back-up to avoid calculation drift
+        const rawAsset = rawMciData.assets.find(a => a.symbol === asset.symbol);
+        if (!rawAsset) return;
+        
+        let activeSum = 0;
+        let weightedSum = 0;
+        
+        // Sum active dimension weights
+        for (const [dimName, dimData] of Object.entries(rawAsset.dimensions)) {
+            if (dimData.available && baseWeights[dimName] !== undefined) {
+                activeSum += baseWeights[dimName];
+            }
+        }
+        
+        if (activeSum > 0) {
+            for (const [dimName, dimData] of Object.entries(rawAsset.dimensions)) {
+                if (dimData.available && baseWeights[dimName] !== undefined) {
+                    const score = dimData.score !== null ? dimData.score : 50;
+                    const activeWeight = baseWeights[dimName] / activeSum;
+                    weightedSum += activeWeight * score;
+                }
+            }
+            asset.mci = Math.round(weightedSum * 10) / 10;
+            asset.level = getSignalLevelJS(asset.mci);
+            
+            totalAssetMci += asset.mci;
+            validAssetCount++;
+        } else {
+            asset.mci = null;
+            asset.level = { level: "无数据", icon: "❓", signal: "暂无信号", signal_icon: "⚪" };
+        }
+    });
+    
+    if (validAssetCount > 0) {
+        mciData.portfolio.mci = Math.round((totalAssetMci / validAssetCount) * 10) / 10;
+        mciData.portfolio.level = getSignalLevelJS(mciData.portfolio.mci);
+    } else {
+        mciData.portfolio.mci = null;
+        mciData.portfolio.level = { level: "无数据", icon: "❓", signal: "暂无信号", signal_icon: "⚪" };
+    }
+    
+    // Auto synchronise the primary quote on recalculation
+    // Based on the recalculated portfolio.mci
+    if (rawMciData.portfolio) {
+        // Map new mci level to retrieve quote category
+        const mciKey = mciData.portfolio.mci <= 20 ? 'freeze' : (mciData.portfolio.mci <= 40 ? 'cold' : (mciData.portfolio.mci <= 60 ? 'neutral' : (mciData.portfolio.mci <= 80 ? 'hot' : 'lava')));
+        // In case the mock quotes aren't fully loaded, we use a simple fallback react
+        const fallbacks = {
+            freeze: "大宗与加密市场极寒，宝妈早已割肉离场，群里静得像深夜的自学教室。",
+            cold: "宝妈们偶尔提起某资产，冷淡地发个抱抱表情包，无人跟风。",
+            neutral: "宝妈们照常接娃做饭，大盘不温不火，群里在聊明天的菜价。",
+            hot: "大妈开始打听如何上车，二姑发来收益截图，群里开始骚动！",
+            lava: "大妈跑步进场！七大姑八大姨都在狂推这个标的，连小区保安都在聊，速退！"
+        };
+        mciData.portfolio.quote = fallbacks[mciKey] || rawMciData.portfolio.quote;
+    }
+    
+    // Refresh GUI rendering
+    renderDashboard();
+}
+
+// Level Colors based on Level names
+const levelColors = {
+    "冰封区": "var(--color-freeze)",
+    "寒冷区": "var(--color-cold)",
+    "温和区": "var(--color-neutral)",
+    "升温区": "var(--color-hot)",
+    "熔岩区": "var(--color-lava)",
+    "无数据": "var(--text-light)"
+};
+
+// Level Badge Background Colors (Opacity 10% / Hex 1A)
+const levelBadgeBgs = {
+    "冰封区": "#eff6ff",
+    "寒冷区": "#ecfeff",
+    "温和区": "#ecfdf5",
+    "升温区": "#fffbeb",
+    "熔岩区": "#fef2f2",
+    "无数据": "#f1f5f9"
+};
+
+async function loadData() {
+    try {
+        // Load web_report.json
+        const reportResp = await fetch('data/web_report.json');
+        mciData = await reportResp.json();
+        
+        // Backup original report
+        rawMciData = JSON.parse(JSON.stringify(mciData));
+        
+        // Load history.json
+        const historyResp = await fetch('data/history.json');
+        historyData = await historyResp.json();
+        
+        renderDashboard();
+        
+        // Setup initial sliders values
+        document.getElementById('weight-fg').value = defaultWeights.fg;
+        document.getElementById('weight-search').value = defaultWeights.search;
+        document.getElementById('weight-leverage').value = defaultWeights.leverage;
+        document.getElementById('weight-trend').value = defaultWeights.trend;
+        document.getElementById('weight-social').value = defaultWeights.social;
+        
+        // Auto default mode
+        switchMode('lite');
+    } catch (e) {
+        console.error("加载数据失败", e);
+        // Fallback display message in the quote card
+        document.getElementById('sidebar-quote-text').innerText = "❌ 数据加载失败！请确保在本地启动 HTTP 服务下打开此页面。";
+    }
+}
+
+function drawSparkline(canvasId, data, color) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+    
+    // Set display width/height
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * window.devicePixelRatio;
+    canvas.height = rect.height * window.devicePixelRatio;
+    
+    const ctx = canvas.getContext('2d');
+    ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+    ctx.clearRect(0, 0, rect.width, rect.height);
+    
+    if (data.length < 2) return;
+    
+    ctx.beginPath();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.5;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    
+    const min = Math.min(...data);
+    const max = Math.max(...data);
+    const range = max - min === 0 ? 1 : max - min;
+    
+    const stepX = rect.width / (data.length - 1);
+    data.forEach((val, i) => {
+        const x = i * stepX;
+        const y = rect.height - 4 - ((val - min) / range) * (rect.height - 8);
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+    
+    // Gradient below sparkline
+    ctx.lineTo(rect.width, rect.height);
+    ctx.lineTo(0, rect.height);
+    ctx.closePath();
+    
+    const grad = ctx.createLinearGradient(0, 0, 0, rect.height);
+    grad.addColorStop(0, color + '1a'); // 10% opacity
+    grad.addColorStop(1, color + '00'); // 0% opacity
+    ctx.fillStyle = grad;
+    ctx.fill();
+}
+
+function renderDashboard() {
+    if (!mciData) return;
+
+    // 1. Update update time and quotes in sidebar
+    if (mciData.timestamp) {
+        const updateDate = new Date(mciData.timestamp);
+        const formatTime = updateDate.toLocaleTimeString('zh-CN', {hour: '2-digit', minute: '2-digit'});
+        document.getElementById('update-time-text').innerText = `数据更新: 今天 ${formatTime}`;
+    }
+    
+    if (mciData.golden_quote) {
+        document.getElementById('sidebar-quote-text').innerText = mciData.golden_quote;
+    }
+    
+    // 2. Set dynamic values for top header cards
+    const portfolio = mciData.portfolio;
+    const pMci = portfolio.mci !== null ? portfolio.mci : 0;
+    const pLevel = portfolio.level.level || "温和区";
+    const pColor = levelColors[pLevel];
+    
+    document.getElementById('top-card-mci-val').innerText = portfolio.mci !== null ? `${portfolio.mci}%` : 'N/A';
+    document.getElementById('top-card-mci-val').style.color = pColor;
+    
+    // Update Lite Hero Panel values
+    const liteIcon = portfolio.level.icon || "😐";
+    const liteSignal = portfolio.level.signal || "暂无信号";
+    const liteQuote = portfolio.quote || "暂无宝妈播报";
+    
+    const heroIconEl = document.getElementById('lite-hero-icon');
+    const heroSignalEl = document.getElementById('lite-hero-signal');
+    const heroQuoteEl = document.getElementById('lite-hero-quote');
+    if (heroIconEl) heroIconEl.innerText = liteIcon;
+    if (heroSignalEl) {
+        heroSignalEl.innerText = `${liteSignal} (${portfolio.mci !== null ? portfolio.mci + '%' : 'N/A'})`;
+        heroSignalEl.style.color = pColor;
+    }
+    if (heroQuoteEl) heroQuoteEl.innerText = liteQuote;
+    
+    // Find BTC & ETH prices dynamically
+    const btcAsset = mciData.assets.find(a => a.symbol.toUpperCase() === 'BTC');
+    const ethAsset = mciData.assets.find(a => a.symbol.toUpperCase() === 'ETH');
+    
+    if (btcAsset) {
+        document.getElementById('top-card-btc-val').innerText = btcAsset.price !== null ? `$ ${btcAsset.price.toLocaleString(undefined, {maximumFractionDigits:0})}` : 'N/A';
+        const btcChange = btcAsset.price_change_14d;
+        const btcChangeText = btcChange !== null ? `较前周 ${btcChange >= 0 ? '+' : ''}${btcChange}% ${btcChange >= 0 ? '↑' : '↓'}` : '较昨日 N/A';
+        document.getElementById('top-card-btc-change').innerText = btcChangeText;
+        document.getElementById('top-card-btc-change').className = `top-card-subtext ${btcChange >= 0 ? 'up' : 'down'}`;
+    }
+    
+    if (ethAsset) {
+        document.getElementById('top-card-eth-val').innerText = ethAsset.price !== null ? `$ ${ethAsset.price.toLocaleString(undefined, {maximumFractionDigits:0})}` : 'N/A';
+        const ethChange = ethAsset.price_change_14d;
+        const ethChangeText = ethChange !== null ? `较前周 ${ethChange >= 0 ? '+' : ''}${ethChange}% ${ethChange >= 0 ? '↑' : '↓'}` : '较昨日 N/A';
+        document.getElementById('top-card-eth-change').innerText = ethChangeText;
+        document.getElementById('top-card-eth-change').className = `top-card-subtext ${ethChange >= 0 ? 'up' : 'down'}`;
+    }
+
+    // Set Date range in header from historyData
+    if (historyData && historyData.length > 0) {
+        const startDate = historyData[0].date;
+        const endDate = historyData[historyData.length - 1].date;
+        document.getElementById('date-range-text').innerText = `${startDate} ~ ${endDate}`;
+    }
+
+    // Draw Top Cards Sparklines dynamically from historyData
+    if (historyData && historyData.length >= 5) {
+        const mciHistory = historyData.map(h => h.portfolio_mci || 50);
+        drawSparkline('sparkline-mci', mciHistory.slice(-15), pColor);
+        
+        // Simulated values sparkline
+        const simulatedValues = mciHistory.map((m, i) => 140000 + m * 500 + i * 400);
+        drawSparkline('sparkline-value', simulatedValues.slice(-15), 'var(--accent-purple)');
+        
+        const btcPrices = historyData.map(h => h.btc_price || 50000);
+        drawSparkline('sparkline-btc', btcPrices.slice(-15), '#f97316');
+        
+        const ethPrices = historyData.map(h => h.eth_price || 3000);
+        drawSparkline('sparkline-eth', ethPrices.slice(-15), '#6366f1');
+    }
+
+    // 3. Render Asset Cards Detail Grid
+    const grid = document.getElementById('assets-grid-container');
+    grid.innerHTML = '';
+    mciData.assets.forEach(asset => {
+        const aLevel = asset.level.level || "无数据";
+        const aColor = levelColors[aLevel];
+        const aBg = levelBadgeBgs[aLevel];
+        const aIcon = asset.market === 'crypto' ? '🔐' : '📈';
+        const aMciStr = asset.mci !== null ? `${asset.mci}%` : 'N/A';
+        
+        let changeClass = '';
+        let changeText = 'N/A';
+        if (asset.price_change_14d !== null) {
+            changeClass = asset.price_change_14d >= 0 ? 'up' : 'down';
+            changeText = (asset.price_change_14d >= 0 ? '+' : '') + asset.price_change_14d + '%';
+        }
+        
+        let priceStr = 'N/A';
+        if (asset.price !== null) {
+            if (asset.market === 'crypto') {
+                priceStr = '$' + asset.price.toLocaleString(undefined, {maximumFractionDigits:0});
+            } else {
+                priceStr = '¥' + asset.price.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
+            }
+        }
+        
+        // Dimensions HTML progress bars
+        let dimsHtml = '';
+        for (const [key, d] of Object.entries(asset.dimensions)) {
+            const score = d.score !== null ? d.score : 0;
+            const barColor = score >= 70 ? 'var(--color-lava)' : (score >= 40 ? 'var(--color-hot)' : 'var(--color-freeze)');
+            const displayScore = d.available ? d.score : 'N/A';
+            
+            // Calculate simulated standard deviation z-score
+            const zScoreVal = ((score - 50) / 15).toFixed(1);
+            const zScoreText = zScoreVal >= 0 ? `+${zScoreVal}σ` : `${zScoreVal}σ`;
+            const zClass = Math.abs(zScoreVal) >= 1.5 ? (zScoreVal >= 0 ? 'z-extreme-high' : 'z-extreme-low') : 'z-neutral';
+            const zHtml = d.available ? `<span class="pro-only dim-zscore-badge ${zClass}">${zScoreText}</span>` : '';
+            
+            dimsHtml += `
+                <div class="dim-row">
+                    <span class="dim-name-label">${d.name}</span>
+                    <div class="dim-bar-bg">
+                        <div class="dim-bar-fill" style="width: ${d.available ? score : 0}%; background: ${barColor}"></div>
+                    </div>
+                    <span class="dim-score-label" style="color: ${d.available ? 'var(--text-main)' : 'var(--text-light)'}">${displayScore}</span>
+                    ${zHtml}
+                </div>
+            `;
+        }
+        
+        const cardHtml = `
+            <div class="asset-card" style="border-top: 4px solid ${aColor}">
+                <div class="asset-header-row">
+                    <div class="asset-title-group">
+                        <span class="asset-icon-wrapper">${aIcon}</span>
+                        <span class="asset-name-label">${asset.name}</span>
+                        <span class="asset-symbol-label">${asset.symbol}</span>
+                    </div>
+                    <span class="asset-level-badge" style="background: ${aBg}; color: ${aColor}">
+                        <span>${asset.level.icon}</span>
+                        <span>${aLevel}</span>
+                    </span>
+                </div>
+                <div class="asset-price-row">
+                    <span class="asset-price-val">${priceStr}</span>
+                    <span class="asset-price-change ${changeClass}">${changeText}</span>
+                </div>
+                <div class="dims-container">
+                    ${dimsHtml}
+                </div>
+                <div class="advice-box">
+                    <span class="advice-icon">💡</span>
+                    <div><strong>反向建议：</strong>${asset.advice}</div>
+                </div>
+            </div>
+        `;
+        grid.innerHTML += cardHtml;
+    });
+
+    // 4. Render Chart.js line graph
+    renderChart();
+}
+
+function renderChart() {
+    if (!historyData) return;
+    const ctx = document.getElementById('history-chart').getContext('2d');
+    
+    // Prepare data
+    // Format dates to mm-dd for clean presentation
+    const labels = historyData.map(h => {
+        const parts = h.date.split('-');
+        return parts.length >= 3 ? `${parts[1]}-${parts[2]}` : h.date;
+    });
+    const mciHistory = historyData.map(h => h.portfolio_mci);
+    const btcPrices = historyData.map(h => h.btc_price);
+    
+    // Pro-only: calculate point styles for extreme buy/sell signals on chart
+    const pointRadii = mciHistory.map(m => (m >= 80 || m <= 20) ? 6 : 0);
+    const pointColors = mciHistory.map(m => m >= 80 ? '#ef4444' : (m <= 20 ? '#10b981' : '#8b5cf6'));
+    const pointHoverRadii = mciHistory.map(m => (m >= 80 || m <= 20) ? 8 : 4);
+    const borderRadii = mciHistory.map(m => (m >= 80 || m <= 20) ? 2 : 0);
+    
+    if (historyChart) {
+        historyChart.destroy();
+    }
+    
+    historyChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: '组合 MCI 拥挤度 (%)',
+                    data: mciHistory,
+                    borderColor: '#8b5cf6',
+                    backgroundColor: 'rgba(139, 92, 246, 0.05)',
+                    yAxisID: 'yMci',
+                    tension: 0.35,
+                    borderWidth: 2,
+                    pointRadius: pointRadii,
+                    pointBackgroundColor: pointColors,
+                    pointBorderColor: '#ffffff',
+                    pointBorderWidth: borderRadii,
+                    pointHoverRadius: pointHoverRadii,
+                    fill: true
+                },
+                {
+                    label: 'BTC 价格 ($)',
+                    data: btcPrices,
+                    borderColor: '#3b82f6',
+                    backgroundColor: 'rgba(59, 130, 246, 0.0)',
+                    yAxisID: 'yPrice',
+                    tension: 0.25,
+                    borderWidth: 2,
+                    pointStyle: 'circle',
+                    pointRadius: 2,
+                    pointHoverRadius: 5
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: {
+                mode: 'index',
+                intersect: false,
+            },
+            plugins: {
+                legend: {
+                    position: 'top',
+                    labels: {
+                        color: '#64748b',
+                        font: { size: 11, family: "'Inter', sans-serif", weight: 500 },
+                        usePointStyle: true,
+                        boxWidth: 8
+                    }
+                },
+                tooltip: {
+                    padding: 10,
+                    backgroundColor: 'rgba(15, 23, 42, 0.9)',
+                    titleFont: { size: 12, family: "'Inter', sans-serif", weight: 600 },
+                    bodyFont: { size: 11, family: "'Inter', sans-serif" },
+                    cornerRadius: 8
+                }
+            },
+            scales: {
+                x: {
+                    grid: { color: 'rgba(0, 0, 0, 0.03)' },
+                    ticks: { color: '#94a3b8', font: { size: 10 } }
+                },
+                yMci: {
+                    type: 'linear',
+                    position: 'left',
+                    min: 0,
+                    max: 100,
+                    grid: { color: 'rgba(0, 0, 0, 0.03)' },
+                    ticks: { color: '#94a3b8', font: { size: 10 } }
+                },
+                yPrice: {
+                    type: 'linear',
+                    position: 'right',
+                    grid: { drawOnChartArea: false },
+                    ticks: { color: '#94a3b8', font: { size: 10 } }
+                }
+            }
+        }
+    });
+}
+
+// Draw HTML5 Canvas Share Poster (Reconstructed to light elegant theme)
+function showPoster() {
+    if (!mciData) return;
+    const modal = document.getElementById('poster-modal');
+    modal.style.display = 'flex';
+    
+    const canvas = document.getElementById('poster-canvas');
+    const ctx = canvas.getContext('2d');
+    
+    // Canvas Size: 600x900
+    // Draw Elegant Light Poster Background
+    const gradient = ctx.createLinearGradient(0, 0, 0, 900);
+    gradient.addColorStop(0, '#f8fafc');
+    gradient.addColorStop(1, '#e2e8f0');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, 600, 900);
+    
+    // Draw Glass-like Poster Content Card
+    ctx.fillStyle = '#ffffff';
+    ctx.strokeStyle = '#e2e8f0';
+    ctx.lineWidth = 1;
+    roundRect(ctx, 30, 30, 540, 840, 16, true, true);
+    
+    // macOS traffic lights on poster
+    ctx.fillStyle = '#ff5f56'; ctx.beginPath(); ctx.arc(60, 60, 6, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#ffbd2e'; ctx.beginPath(); ctx.arc(80, 60, 6, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#27c93f'; ctx.beginPath(); ctx.arc(100, 60, 6, 0, Math.PI * 2); ctx.fill();
+    
+    // Date & Header
+    ctx.fillStyle = '#64748b';
+    ctx.font = 'bold 12px -apple-system, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText('ALPHAMOM QUANT INDEX', 130, 65);
+    
+    const todayStr = new Date().toLocaleDateString('zh-CN', {year:'numeric', month:'2-digit', day:'2-digit'}) + ' ' + new Date().toLocaleTimeString('zh-CN', {hour:'2-digit', minute:'2-digit'});
+    ctx.textAlign = 'right';
+    ctx.fillText(todayStr, 570 - 30, 65);
+    
+    // Title
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#0f172a';
+    ctx.font = 'bold 32px -apple-system, sans-serif';
+    ctx.fillText('👩‍👦 宝妈反买量化简报', 300, 140);
+    
+    // MCI value box
+    const port = mciData.portfolio;
+    const level = port.level.level || "无数据";
+    const colorHex = level === "冰封区" ? '#3b82f6' : (level === "寒冷区" ? '#06b6d4' : (level === "温和区" ? '#10b981' : (level === "升温区" ? '#f59e0b' : '#ef4444')));
+    
+    ctx.fillStyle = '#f8fafc';
+    ctx.strokeStyle = colorHex + '50';
+    ctx.lineWidth = 1.5;
+    roundRect(ctx, 160, 180, 280, 150, 12, true, true);
+    
+    ctx.fillStyle = colorHex;
+    ctx.font = 'bold 64px -apple-system, sans-serif';
+    ctx.fillText(port.mci !== null ? port.mci + '%' : 'N/A', 300, 260);
+    
+    ctx.fillStyle = '#64748b';
+    ctx.font = 'bold 14px -apple-system, sans-serif';
+    ctx.fillText(`${port.level.icon} ${level} · 组合拥挤度`, 300, 305);
+    
+    // Quote Box
+    ctx.fillStyle = '#f1f5f9';
+    ctx.strokeStyle = '#e2e8f0';
+    ctx.lineWidth = 1;
+    roundRect(ctx, 60, 360, 480, 120, 10, true, true);
+    
+    ctx.fillStyle = '#334155';
+    ctx.font = 'italic 15px -apple-system, sans-serif';
+    ctx.textAlign = 'left';
+    
+    // Wrap quote text
+    const quoteText = '📢 ' + port.quote;
+    wrapText(ctx, quoteText, 80, 400, 440, 22);
+    
+    // Asset list on poster
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#475569';
+    ctx.font = 'bold 15px -apple-system, sans-serif';
+    ctx.fillText('📌 核心标的指数', 60, 520);
+    
+    let cardY = 540;
+    mciData.assets.forEach(asset => {
+        if (asset.mci === null) return; // Skip N/A in poster
+        
+        ctx.fillStyle = '#f8fafc';
+        ctx.strokeStyle = '#e2e8f0';
+        ctx.lineWidth = 1;
+        roundRect(ctx, 60, cardY, 480, 64, 8, true, true);
+        
+        // Left color accent bar
+        const aLevel = asset.level.level;
+        const aColorHex = aLevel === "冰封区" ? '#3b82f6' : (aLevel === "寒冷区" ? '#06b6d4' : (aLevel === "温和区" ? '#10b981' : (aLevel === "升温区" ? '#f59e0b' : '#ef4444')));
+        ctx.fillStyle = aColorHex;
+        ctx.fillRect(60, cardY + 5, 4, 54);
+        
+        // Symbol & Name
+        ctx.fillStyle = '#0f172a';
+        ctx.font = 'bold 15px -apple-system, sans-serif';
+        const aIcon = asset.market === 'crypto' ? '🔐' : '📈';
+        ctx.fillText(`${aIcon} ${asset.name} (${asset.symbol})`, 80, cardY + 38);
+        
+        // Score
+        ctx.textAlign = 'right';
+        ctx.fillStyle = aColorHex;
+        ctx.font = 'bold 20px -apple-system, sans-serif';
+        ctx.fillText(`${asset.mci}%`, 520, cardY + 39);
+        
+        ctx.fillStyle = '#64748b';
+        ctx.font = '500 11px -apple-system, sans-serif';
+        ctx.fillText(asset.level.icon + ' ' + aLevel, 520, cardY + 20);
+        
+        ctx.textAlign = 'left';
+        cardY += 76;
+    });
+    
+    // Bottom Disclaimer
+    ctx.fillStyle = '#94a3b8';
+    ctx.font = '11px -apple-system, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('⚠️ 免责声明: 本工具仅供娱乐参考,不构成投资建议。宝妈反买,盈亏自负。', 300, 815);
+    ctx.fillText('AlphaMom — 外行看个乐，内行看门道。', 300, 835);
+}
+
+function closePoster() {
+    document.getElementById('poster-modal').style.display = 'none';
+}
+
+function downloadPoster() {
+    const canvas = document.getElementById('poster-canvas');
+    const link = document.createElement('a');
+    link.download = `alphamom-report-${new Date().toISOString().slice(0,10)}.png`;
+    link.href = canvas.toDataURL("image/png");
+    link.click();
+}
+
+// Canvas rounded rect helper
+function roundRect(ctx, x, y, width, height, radius, fill, stroke) {
+    if (typeof radius === 'undefined') {
+        radius = 5;
+    }
+    ctx.beginPath();
+    ctx.moveTo(x + radius, y);
+    ctx.lineTo(x + width - radius, y);
+    ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+    ctx.lineTo(x + width, y + height - radius);
+    ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+    ctx.lineTo(x + radius, y + height);
+    ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+    ctx.lineTo(x, y + radius);
+    ctx.quadraticCurveTo(x, y, x + radius, y);
+    ctx.closePath();
+    if (fill) {
+        ctx.fill();
+    }
+    if (stroke) {
+        ctx.stroke();
+    }
+}
+
+// Canvas Text Wrap Helper
+function wrapText(ctx, text, x, y, maxWidth, lineHeight) {
+    const words = text.split('');
+    let line = '';
+    for(let n = 0; n < words.length; n++) {
+        let testLine = line + words[n];
+        let metrics = ctx.measureText(testLine);
+        let testWidth = metrics.width;
+        if (testWidth > maxWidth && n > 0) {
+            ctx.fillText(line, x, y);
+            line = words[n];
+            y += lineHeight;
+        }
+        else {
+            line = testLine;
+        }
+    }
+    ctx.fillText(line, x, y);
+}
+
+// Init Load
+window.onload = loadData;
+</script>
+</body>
+</html>

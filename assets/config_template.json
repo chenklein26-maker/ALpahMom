@@ -21,6 +21,16 @@
       "symbol": "600519",
       "name": "贵州茅台",
       "weight": 1.0
+    },
+    {
+      "symbol": "518880",
+      "name": "黄金ETF",
+      "weight": 1.0
+    },
+    {
+      "symbol": "161725",
+      "name": "招商中证白酒",
+      "weight": 1.0
     }
   ],
   "mci_params": {
