@@ -1,0 +1,55 @@
+{
+  "sass_level": "medium",
+  "crypto_assets": [
+    {
+      "coin_id": "bitcoin",
+      "symbol": "BTC",
+      "name": "Bitcoin",
+      "search_keyword": "bitcoin",
+      "weight": 1.0
+    },
+    {
+      "coin_id": "ethereum",
+      "symbol": "ETH",
+      "name": "Ethereum",
+      "search_keyword": "ethereum",
+      "weight": 1.0
+    }
+  ],
+  "astock_assets": [
+    {
+      "symbol": "600519",
+      "name": "贵州茅台",
+      "weight": 1.0
+    }
+  ],
+  "mci_params": {
+    "weights": {
+      "fear_greed": 0.2,
+      "search_interest": 0.2,
+      "derivatives": 0.25,
+      "price_trend": 0.2,
+      "social_sentiment": 0.15
+    },
+    "momentum": {
+      "lookback_days": 14,
+      "history_window": 252
+    },
+    "trend_deviation": {
+      "ma_period": 200,
+      "sensitivity": 200
+    },
+    "volatility": {
+      "window_days": 30,
+      "annualization_factor_crypto": 365,
+      "annualization_factor_astock": 252
+    },
+    "signal_thresholds": {
+      "freeze": 20,
+      "cold": 40,
+      "neutral": 60,
+      "hot": 80,
+      "lava": 100
+    }
+  }
+}

@@ -1,0 +1,36 @@
+# Runtime data cache
+data/
+
+# Box internal
+.thumbs/
+.skill-creator/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Virtual env
+venv/
+.venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Config with personal settings
+alpha_mom_config.json
